@@ -10,30 +10,29 @@ export const addComplaint = async (req, res) => {
 
     try {
         if (!title || !description || !complainedAboutUsername) {
-            return res.status(400).send({ error: "Please fill all fields" });
+            return res.status(400).send({ message: "Zəhmət olmasa bütün xanaları doldurun" });
         }
-        const formattedComplainantType  = complainantType.charAt(0).toUpperCase() + complainantType.slice(1);
+        const formattedComplainantType = complainantType.charAt(0).toUpperCase() + complainantType.slice(1);
 
         if (formattedComplainantType === 'User') {
             complainedAboutType = 'Listener';
-            const listener = await Listener.findOne({ username: complainedAboutUsername });
+            const listener = await Listener.findOne({ nickname: complainedAboutUsername });
             if (!listener) {
-                return res.status(404).send({ error: "Listener not found" });
+                return res.status(404).send({ message: "Belə bir dinləyici tapılmadı" });;
             }
             complainedAboutId = listener._id;
         } else if (formattedComplainantType === 'Listener') {
             complainedAboutType = 'User';
             const user = await User.findOne({ username: complainedAboutUsername });
             if (!user) {
-                return res.status(404).send({ error: "User not found" });
+                return res.status(404).send({ message: "Belə bir danışan tapılmadı" });;
             }
             complainedAboutId = user._id;
         }
-        
 
         const newComplaint = await Complaint.create({
             complainantId,
-            complainantType:formattedComplainantType,
+            complainantType: formattedComplainantType,
             complainedAboutId,
             complainedAboutType,
             title,
@@ -50,16 +49,20 @@ export const addComplaint = async (req, res) => {
             await user.save();
         }
 
-        res.status(201).send(newComplaint);
+        res.status(201).send(
+            {
+                message: "Sizin şikayətiniz uğurla göndərildi!",
+                data: newComplaint
+            });
     } catch (error) {
         console.error('Error creating complaint:', error);
-        res.status(500).send({ error: "Something went wrong" });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
 
 export const getComplaintList = async (req, res) => {
     try {
-        const complaints = await Complaint.find();
+        const complaints = await Complaint.find().sort({ createdAt: -1 }); 
         if (!complaints || complaints.length === 0) {
             return res.status(404).send({ error: "Complaint not found" });
         }
@@ -83,6 +86,6 @@ export const getComplaintList = async (req, res) => {
         res.status(200).send(enrichedComplaints);
     } catch (error) {
         console.error('Error fetching complaints:', error);
-        res.status(500).send({ error: "Something went wrong" });
+        res.status(500).send({ error: 'Server xətası' });
     }
 }

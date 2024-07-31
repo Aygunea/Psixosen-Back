@@ -2,14 +2,12 @@ import express from 'express';
 import {
     createPoolRequest,
     acceptSessionRequest,
-    getAllSessions,
-    getPoolRequests,
     createSpecificRequest,
-    createSpecificMomentaryRequest,
-    acceptSpecificMomentaryRequest,
-    getCompletedSessions
+    getRequests,
+    getCompletedSessions,
+    // availableslots
 } from '../controllers/session.controllers.js';
-import protectRoutes from '../middlewares/protectRoutes.js'; // If needed
+import protectRoutes from '../middlewares/protectRoutes.js'; 
 
 const router = express.Router();
 router.use(protectRoutes)
@@ -17,11 +15,8 @@ router.post('/poolrequest', createPoolRequest);
 router.post('/accept-request', acceptSessionRequest);
 router.post('/suggest/:listenerId', createSpecificRequest);
 
-router.post('/momentary/:listenerId', createSpecificMomentaryRequest);
-router.post('/accept-momentary', acceptSpecificMomentaryRequest);
-
-router.get('/', getAllSessions);
-router.get('/poolrequest', getPoolRequests);
+router.get('/', getRequests);
 router.get('/completed-sessions', getCompletedSessions);
+// router.get('/available-slots/:listenerId',availableslots)
 
 export default router;

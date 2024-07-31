@@ -7,10 +7,10 @@ export const addSuggestion = async (req, res) => {
     const { _id: userId, role: userType } = req.user;
 
     if (!userId || !userType || !description) {
-        return res.status(400).send({ error: "Please fill all fields" });
+        return res.status(400).send({ message: "Zəhmət olmasa bütün xanaları doldurun" });
     }
 
-    // userType'ı büyük harfe çevir
+    // userType'ı böyük herf çevir
     const formattedUserType = userType.charAt(0).toUpperCase() + userType.slice(1);
 
     try {
@@ -24,7 +24,7 @@ export const addSuggestion = async (req, res) => {
 
         res.status(201).send({ suggestion: newSuggestion });
     } catch (error) {
-        res.status(500).send({ error: "Something went wrong" });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
 
@@ -52,7 +52,7 @@ export const getUserSuggestions = async (req, res) => {
         res.status(200).send(suggestions);
     } catch (error) {
         console.error(error);
-        res.status(500).send({ error: "Something went wrong" });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
 
@@ -62,12 +62,12 @@ export const getAllSuggestions = async (req, res) => {
             path: 'userId',
             model: req.user.role === 'listener' ? Listener : User, 
             select: 'username' 
-        });
+        }).sort({createdAt:-1})
 
         res.status(200).send(suggestions);
     } catch (error) {
         console.error("Error fetching suggestions:", error);
-        res.status(500).send({ error: "Something went wrong" });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
 

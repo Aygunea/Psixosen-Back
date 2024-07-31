@@ -19,7 +19,7 @@ const ListenerSchema = new mongoose.Schema({
         index: true
     },
     phone: {
-        type: Number,
+        type: String,
         required: true,
         unique: true,
     },
@@ -29,7 +29,6 @@ const ListenerSchema = new mongoose.Schema({
     },
     birth: {
         type: String,
-        required: true,
     },
     password: {
         type: String,
@@ -42,7 +41,6 @@ const ListenerSchema = new mongoose.Schema({
     },
     diploma: {
         type: String,
-        required: true,
     },
     fieldOfActivity: {
         type: String,
@@ -58,7 +56,6 @@ const ListenerSchema = new mongoose.Schema({
     },
     additions: {
         type: String,
-        required: true,
     },
     category: {
         type: String,
@@ -66,6 +63,14 @@ const ListenerSchema = new mongoose.Schema({
     },
     profilePic: {
         type: String,
+    },
+    isAdmin: {
+        type: Boolean,
+        default: false
+    },
+    isActive: {
+        type: Boolean,
+        default: false,
     },
     sessions: [{
         type: mongoose.Schema.Types.ObjectId,

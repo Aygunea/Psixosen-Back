@@ -19,7 +19,7 @@ export const getMessage = async (request, response) => {
                     { $elemMatch: { id: receiverId, model: receiverModel } }
                 ]
             }
-        }).populate('messages');
+        }).populate('messages').populate('lastMessage');
 
         if (!conversation) {
             return response.status(200).send([]);
@@ -114,7 +114,6 @@ export const sendMessage = async (request, response) => {
                 { userId: receiverId, listenerId: senderId, status: { $in: ['pending', 'accepted'] } }
             ]
         });
-        console.log(session + "sessions");
         if (!session) {
             return response.status(404).send({ error: "Session not found or invalid status" });
         }
@@ -138,26 +137,23 @@ export const sendMessage = async (request, response) => {
         response.status(500).send({ error: "Internal server error" });
     }
 };
-// Mesajı okundu olarak işaretleme
-// router.patch('/read/:id', 
-    export const readMark =async (req, res) => {
+
+export const readMark =  async (req, res) => {
     try {
-      const messageId = req.params.id;
-  
-      // Mesajı güncelle
-      const updatedMessage = await Message.findByIdAndUpdate(
-        messageId,
-        { read: true },
-        { new: true } // Güncellenmiş mesajı geri döndür
-      );
-  
-      if (!updatedMessage) {
-        return res.status(404).send({ error: "Message not found" });
-      }
-  
-      res.status(200).send(updatedMessage);
+        const { messageIds } = req.body;
+
+        if (!messageIds || !Array.isArray(messageIds)) {
+            return res.status(400).send({ message: 'Invalid message IDs' });
+        }
+
+        await Message.updateMany(
+            { _id: { $in: messageIds } },
+            { $set: { read: true } }
+        );
+
+        res.status(200).send({ message: 'Messages marked as read' });
     } catch (error) {
-      console.error('Error marking message as read:', error);
-      res.status(500).send({ error: "Internal server error" });
+        console.error('Error updating read status:', error);
+        res.status(500).send({ error: 'Internal server error' });
     }
-  };
+}

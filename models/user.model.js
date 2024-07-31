@@ -25,6 +25,14 @@ const UserSchema =new mongoose.Schema({
     profilePic: {
         type: String,
     },
+    isAdmin:{
+        type: Boolean,
+        default: false
+    },
+    isActive:{
+        type: Boolean,
+        default: true
+    },
     sessions: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Session'

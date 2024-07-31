@@ -5,7 +5,7 @@ export const addMusic = async (req, res) => {
     const musicFile = req.files['musicFile'] ? req.files['musicFile'][0] : null;
     const coverImage = req.files['coverImage'] ? req.files['coverImage'][0] : null;
 
-    if (!title || !artist || !musicFile || !duration) {
+    if (!title || !artist || !musicFile || !duration || !coverImage) {
         return res.status(400).send({ error: "Please fill all fields" });
     }
 
@@ -14,7 +14,7 @@ export const addMusic = async (req, res) => {
             title,
             artist,
             url: musicFile.path,
-            coverImage: coverImage ? coverImage.path : null,
+            coverImage: coverImage.path,
             duration
         });
         res.status(201).send(newMusic);

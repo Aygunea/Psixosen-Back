@@ -1,8 +1,9 @@
 import Session from '../models/session.model.js';
-import { io, getSocketId } from '../socket.js'; // io ve getSocketId'yi içe aktar
+import { io, getSocketId } from '../socket.js';
 import Listener from '../models/listener.model.js';
 import User from '../models/User.model.js';
-import { createNotification } from './notfication.controllers.js'; // Bildiriş yaratma funksiyasını import edin
+import { createNotification } from './notfication.controllers.js';
+import mongoose from 'mongoose';
 
 // Dinləyici adını əldə etmək funksiyası
 const getListenerName = async (listenerId) => {
@@ -16,75 +17,106 @@ const getUserName = async (userId) => {
     return user ? user.username : "Unknown User";
 };
 
+const updateTimedOutSessions = async () => {
+    const now = new Date();
+    await Session.updateMany(
+        { status: 'pending', sessionStartTime: { $lt: now } },
+        { $set: { status: 'timedout' } }
+    );
+};
+
 export const createPoolRequest = async (req, res) => {
 
     try {
         const { topic, duration, details, price, } = req.body;
         const { _id: userId } = req.user
-
+        console.log(userId);
         if (!userId || !topic || !duration || !price) {
-            return res.status(400).send({ error: 'Invalid request' });
+            return res.status(400).send({ message: "Zəhmət olmasa bütün xanaları doldurun" });
         }
 
         const newRequest = await Session.create({ userId, topic, duration, details, price, });
         await User.findByIdAndUpdate(userId, { $push: { sessions: newRequest._id } });
 
-        // İstek havuzunu dinleyen dinleyicilere bildir
-        io.emit('new-request', newRequest);
+        const populatedRequest = await Session.findById(newRequest._id)
+            .populate('userId');
 
-        res.status(201).send(newRequest);
-    } catch (error) {
-        res.status(500).send({ error: 'Internal server error' });
-    }
-};
-export const createSpecificMomentaryRequest = async (req, res) => {
-    try {
-        const { listenerId } = req.params;
-        const { _id: userId } = req.user;
-        const { topic, duration, details, price } = req.body;
+        // Emit the populated request to all listeners
+        io.emit('pool-request', populatedRequest);
 
-        if (!userId || !topic || !duration || !price) {
-            return res.status(400).send({ error: 'Invalid request' });
-        }
-        // Create the session request
-        const newRequest = await Session.create({
-            userId,
-            listenerId,
-            topic,
-            duration,
-            details,
-            price,
+        res.status(201).send({
+            message: "Sizin təklifiniz uğurla göndərildi!",
+            data: populatedRequest
         });
-
-        // Update user with the new session
-        await User.findByIdAndUpdate(userId, { $push: { sessions: newRequest._id } });
-
-        // Notify the listener if online
-        // const listenerSocketId = getSocketId(listenerId);
-        // if (listenerSocketId) {
-        //     io.to(listenerSocketId).emit('new-request', newRequest);
-        // }
-
-        res.status(201).send(newRequest);
     } catch (error) {
-        console.error('Error creating specific pool request:', error);
-        res.status(500).send({ error: 'Internal server error' });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
-export const createSpecificRequest = async (req, res) => {
-    try {
-        const { listenerId } = req.params;
-        const { _id: userId } = req.user;
+// export const availableslots = async (req, res) => {
+//     const { listenerId } = req.params;
+//     try {
+//         const currentDate = new Date();
+//         const endDate = new Date();
+//         endDate.setDate(currentDate.getDate() + 7); // Get slots for the next 7 days
 
+//         const sessions = await Session.find({
+//             listenerId: mongoose.Types.ObjectId(listenerId),
+//             sessionStartTime: { $gte: currentDate },
+//             endTime: { $lte: endDate }
+//         });
+
+//         res.json(sessions);
+//     } catch (error) {
+//         console.error('Error fetching slots:', error);
+//         res.status(500).json({ message: 'Server error' });
+//     }
+// }
+
+// const checkSessionAvailability = async (listenerId, selectedDate, duration) => {
+//     const startTime = new Date(selectedDate);
+//     const endTime = new Date(startTime.getTime() + duration * 60000); // Duration'ı milisaniyeye çevirin
+
+//     try {
+//         const overlappingSessions = await Session.find({
+//             listenerId: mongoose.Types.ObjectId(listenerId),
+//             sessionStartTime: { $lt: endTime }, // Seansın bitiş zamanı istenilen zaman diliminden önce başlamalı
+//             endTime: { $gt: startTime } // Seansın bitiş zamanı istenilen zaman diliminden sonra bitmemeli
+//         });
+
+//         if (overlappingSessions.length > 0) {
+//             return { success: false, message: 'Dinleyicinin bu zaman diliminde mevcut bir seansı var.' };
+//         }
+
+//         return { success: true, message: 'Dinleyici bu zaman diliminde müsait.' };
+//     } catch (error) {
+//         console.error('Hata:', error);
+//         return { success: false, message: 'Sunucu hatası' };
+//     }
+// };
+
+export const createSpecificRequest = async (req, res) => {
+    const { listenerId } = req.params;
+    const { _id: userId } = req.user;
+    // const { selectedDate, duration } = req.body;
+
+    // const availabilityCheck = await checkSessionAvailability(listenerId, selectedDate, duration);
+
+    // if (!availabilityCheck.success) {
+    //     return res.status(400).json({ message: availabilityCheck.message });
+    // }
+    try {
         const { topic, duration, details, price, sessionStartTime } = req.body;
         if (!userId || !topic || !duration || !price || !sessionStartTime) {
-            return res.status(400).send({ error: 'Invalid request' });
+            return res.status(400).send({ message: "Zəhmət olmasa bütün xanaları doldurun" });
         }
 
         const newRequest = await Session.create({ userId, listenerId, topic, sessionStartTime, duration, details, price });
 
         await User.findByIdAndUpdate(userId, { $push: { sessions: newRequest._id } });
         await Listener.findByIdAndUpdate(listenerId, { $push: { sessions: newRequest._id } });
+
+        const populatedRequest = await Session.findById(newRequest._id)
+            .populate('userId');
 
         const userName = await getUserName(userId);
         const timeString = new Date(sessionStartTime).toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -94,24 +126,21 @@ export const createSpecificRequest = async (req, res) => {
 
         // Bildirişi yarat
         await createNotification({
-            body: {
-                title: 'Yeni Seans Təklifi',
-                message: notificationMessage,
-                type: 'info',
-                recipient: {
-                    id: listenerId,
-                    model: 'Listener'
-                }
+            title: 'Yeni Seans Təklifi',
+            message: notificationMessage,
+            type: 'info',
+            recipient: {
+                id: listenerId,
+                model: 'Listener'
             }
         });
+        io.emit('specific-request', populatedRequest);
 
-        res.status(201).send(newRequest);
+        res.status(201).send(populatedRequest);
     } catch (error) {
-        console.error('Error creating specific request:', error);
-        res.status(500).send({ error: 'Internal server error' });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
-
 
 export const acceptSessionRequest = async (req, res) => {
     try {
@@ -120,18 +149,17 @@ export const acceptSessionRequest = async (req, res) => {
 
         const request = await Session.findById(requestId);
         if (!request) {
-            return res.status(404).send('Request not found');
+            return res.status(404).send({ message: 'Belə bir istək tapılmadı' });
         }
-
         if (request.status !== 'pending') {
-            return res.status(400).send('Request already accepted or invalid status');
+            return res.status(400).send({ message: 'İstək artıq qəbul edilib' });
         }
 
         // Check if the request is a pool request or specific request
         if (!request.listenerId) {
             // Pool request
             request.listenerId = listenerId;
-            request.sessionStartTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes later
+            request.sessionStartTime = new Date(Date.now() + 5 * 60 * 1000);
         }
         request.status = 'accepted';
         request.endTime = new Date(request.sessionStartTime.getTime() + request.duration * 60000); // Calculate end time
@@ -140,14 +168,14 @@ export const acceptSessionRequest = async (req, res) => {
         await Listener.findByIdAndUpdate(listenerId, { $push: { sessions: request._id } });
 
         // Notify other listeners that the request is accepted and removed
-        io.emit('request-removed', requestId);
+        io.emit('request-removed-from-pool', requestId);
 
-        // Notify the client
+        // // Notify the client
         const clientSocketId = getSocketId(request.userId.toString());
         if (clientSocketId) {
             io.to(clientSocketId).emit('request-accepted', request);
         }
-        // Bildiriş yaratma
+
         // Dinləyici və istifadəçi adlarını əldə etmək
         const listenerName = await getListenerName(listenerId);
         const userName = await getUserName(request.userId);
@@ -160,149 +188,100 @@ export const acceptSessionRequest = async (req, res) => {
         const notificationMessageUser = `
         Seans təklifiniz ${listenerName} adlı dinləyici tərəfindən qəbul edildi. 
         ${timeString} | ${dateString} tarixində seansınız baş tutacaqdır.`;
-        const notificationMessageListener = `${userName}  adlı dinləyicinin təklifini qəbul etdiniz. Seans ${timeString} | ${dateString} tarixində baş tutacaqdır.`;
 
+        const notificationMessageListener = `${userName}  adlı dinləyicinin təklifini qəbul etdiniz. 
+        Seans ${timeString} | ${dateString} tarixində baş tutacaqdır.`;
+        // Bildirişi yarat
         await createNotification({
-            body: {
-                title: 'Yeni Seans',
-                message: notificationMessageUser,
-                type: 'info',
-                recipient: {
-                    id: request.userId,
-                    model: 'User'
-                }
+            title: 'Yeni Seans',
+            message: notificationMessageListener,
+            type: 'info',
+            recipient: {
+                id: listenerId,
+                model: 'Listener'
             }
-        }, res);
+        });
+        await createNotification({
+            title: 'Yeni Seans',
+            message: notificationMessageUser,
+            type: 'info',
+            recipient: {
+                id: request.userId,
+                model: 'User'
+            }
+        });
 
-        await createNotification({
-            body: {
-                title: 'Yeni Seans',
-                message: notificationMessageListener,
-                type: 'info',
-                recipient: {
-                    id: listenerId,
-                    model: 'Listener'
-                }
-            }
-        }, res);
         // Schedule session completion
         setTimeout(async () => {
             request.status = 'completed';
             await request.save();
             console.log(`Session ${request._id} completed`);
-
-            // Notify the client and listener that the session is complete
-            // if (clientSocketId) {
-            //     io.to(clientSocketId).emit('session-completed', request);
-            // }
-            // const listenerSocketId = getSocketId(request.listenerId.toString());
-            // if (listenerSocketId) {
-            //     io.to(listenerSocketId).emit('session-completed', request);
-            // }
-
-        }, request.duration * 60 * 1000); // Convert duration from minutes to milliseconds
+        }, request.duration * 60 * 1000);
 
         res.status(200).send(request);
     } catch (error) {
         console.error('Error accepting session request:', error);
-        res.status(500).send({ error: 'Internal server error' });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
 
-// anliq spesifik muraciet qebulu
-export const acceptSpecificMomentaryRequest = async (req, res) => {
+export const getRequests = async (req, res) => {
     try {
-        const { _id: requestId } = req.body;
-        const { _id: listenerId } = req.user;
+        const { _id: userId, role } = req.user;
+        const { type } = req.query;
 
-        const request = await Session.findById(requestId);
-        if (!request) {
-            return res.status(404).send('Request not found');
+        await updateTimedOutSessions();
+
+        let query = {};
+
+        if (role === 'listener') {
+            // Listener istəkləri
+            if (type === 'pool') {
+                query = { listenerId: { $exists: false }, status: 'pending' };
+            } else {
+                query = {
+                    listenerId: userId,
+                    status: { $in: ['accepted', 'pending'] }
+                };
+            }
+        } else {
+            // User istəkləri
+            query = {
+                userId,
+                status: { $in: ['accepted', 'pending'] }
+            };
         }
 
-        if (request.status !== 'pending') {
-            return res.status(400).send('Request already accepted or invalid status');
-        }
-
-        if (!request.listenerId || request.listenerId.toString() !== listenerId.toString()) {
-            return res.status(403).send('You are not authorized to accept this request');
-        }
-
-        // Set session start time and update status
-        request.sessionStartTime = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes later
-        request.status = 'accepted';
-        request.endTime = new Date(request.sessionStartTime.getTime() + request.duration * 60000); // Calculate end time
-        await request.save();
-
-        // Notify the client
-        const clientSocketId = getSocketId(request.userId.toString());
-        if (clientSocketId) {
-            io.to(clientSocketId).emit('request-accepted', request);
-        }
-
-        // Schedule session completion
-        setTimeout(async () => {
-            request.status = 'completed';
-            await request.save();
-            console.log(`Session ${request._id} completed`);
-
-            // Notify the client and listener that the session is complete
-            // if (clientSocketId) {
-            //     io.to(clientSocketId).emit('session-completed', request);
-            // }
-            // const listenerSocketId = getSocketId(request.listenerId.toString());
-            // if (listenerSocketId) {
-            //     io.to(listenerSocketId).emit('session-completed', request);
-            // }
-
-        }, request.duration * 60000); // Convert duration from minutes to milliseconds
-
-        res.status(200).send(request);
+        const requests = await Session.find(query)
+            .populate('userId')
+            .populate('listenerId')
+            .sort({ createdAt: -1 });
+        res.status(200).send(requests);
     } catch (error) {
-        console.error('Error accepting specific momentary request:', error);
-        res.status(500).send({ error: 'Internal server error' });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };
 
-export const getAllSessions = async (req, res) => {
-    try {
-        const { _id: userId } = req.user;
-
-        // Find all sessions where the user is either the listener or the session creator
-        const allSessions = await Session.find({ $or: [{ userId }, { listenerId: userId }] })
-            .populate('userId').populate('listenerId');
-
-        res.status(200).send(allSessions);
-    } catch (error) {
-        console.error('Error retrieving allSessions:', error);
-        res.status(500).send({ error: 'Internal server error' });
-    }
-};
-
-export const getPoolRequests = async (req, res) => {
-    try {
-        const poolRequests = await Session.find({ listenerId: { $exists: false }, status: 'pending' })
-            .populate('userId').populate('listenerId');;
-        res.status(200).send(poolRequests);
-    } catch (error) {
-        console.error('Error retrieving pool requests:', error);
-        res.status(500).send({ error: 'Internal server error' });
-    }
-};
 export const getCompletedSessions = async (req, res) => {
     try {
         const { _id: userId } = req.user;
 
-        // Kullanıcının tamamlanmış seanslarını bul
+        await updateTimedOutSessions();
+
         const completedSessions = await Session.find({
-            $or: [{ userId, status: 'completed' }, { listenerId: userId, status: 'completed' }]
+            $or: [
+                { userId, status: 'completed' },
+                { listenerId: userId, status: 'completed' },
+                { userId, status: 'timedout' },
+                { listenerId: userId, status: 'timedout' }
+            ]
         })
             .populate('userId')
-            .populate('listenerId');
+            .populate('listenerId')
+            .sort({ createdAt: -1 });
 
         res.status(200).send(completedSessions);
     } catch (error) {
-        console.error('Error retrieving completed sessions:', error);
-        res.status(500).send({ error: 'Internal server error' });
+        res.status(500).send({ error: 'Server xətası' });
     }
 };

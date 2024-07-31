@@ -14,7 +14,6 @@ import complaintRoute from './routes/complaints.routes.js'
 import suggestRoute from './routes/suggestion.routes.js'
 import musicRoute from './routes/music.routes.js'
 import contactRoute from './routes/contact.routes.js'
-
 import cookieParser from 'cookie-parser';
 import { app, server } from './socket.js'
 

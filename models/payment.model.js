@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const paymentSchema = new mongoose.Schema({
-    payer: { 
+    payer: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
@@ -11,23 +11,14 @@ const paymentSchema = new mongoose.Schema({
         ref: 'Listener',
         required: true
     },
-    amount: { 
+    amount: {
         type: Number,
         required: true
     },
-    paymentDate: { 
-        type: Date,
-        default: Date.now
-    },
-    paymentStatus: { 
+    paymentStatus: {
         type: String,
-        enum: ['success', 'failure', 'refund'],
-        default: 'success'
-    },
-    paymentReference: {
-        type: String,
-        required: true,
-        unique: true
+        enum: ['pending,success', 'failure', 'refund'],
+        default: 'pending'
     }
 }, { timestamps: true });
 

@@ -7,7 +7,7 @@ router.use(protectRoutes)
 router.get('/', getAllMessages)
 router.get('/:receiverId', getMessage)
 router.post('/:receiverId', sendMessage)
-router.patch('/read/:id', readMark)
+router.patch('/messages/read', readMark)
 
 
 export default router
