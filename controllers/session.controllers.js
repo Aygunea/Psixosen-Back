@@ -3,7 +3,6 @@ import { io, getSocketId } from '../socket.js';
 import Listener from '../models/listener.model.js';
 import User from '../models/User.model.js';
 import { createNotification } from './notfication.controllers.js';
-import mongoose from 'mongoose';
 
 // Dinləyici adını əldə etmək funksiyası
 const getListenerName = async (listenerId) => {
